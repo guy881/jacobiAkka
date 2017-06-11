@@ -8,6 +8,8 @@ object MasterActor {
 }
 
 class MasterActor(threadsNum: Int, iterLimit: Int) extends Actor {
+  val DEBUG = false
+  var t1: Long = System.nanoTime
   var workNumber = 0
   val threadsNumber: Int = threadsNum
   var iteration = 0
@@ -23,6 +25,7 @@ class MasterActor(threadsNum: Int, iterLimit: Int) extends Actor {
 
   override def receive: Receive = {
     case InitMaster(aFile, bFile) =>
+      t1 = System.nanoTime  // measure time
       // read input matrices
       val A = Matrix.LoadMatrixFromFile(aFile)
       val b = Matrix.LoadMatrixFromFile(bFile)
@@ -43,15 +46,6 @@ class MasterActor(threadsNum: Int, iterLimit: Int) extends Actor {
             R.PutAt(i, j, elem)
         }
       }
-
-      //      println("A: ")
-      //      println(A)
-      //      println("b: ")
-      //      println(b)
-      //      println("D ^-1: ")
-      //      println(D)
-      //      println("R: ")
-      //      println(R)
 
       xk = new Vec(A.rows)
       // create and init slaves
@@ -88,26 +82,27 @@ class MasterActor(threadsNum: Int, iterLimit: Int) extends Actor {
         slavesArray(i) ! Calculate(xk, start, end)
       }
 
-    //    x.PrintMatrix()
-
-
-    // if converged -> return result
-
-    // get x(k) from slave
-    case returnX(xkPlus1) =>
+      /////////////////////////////////////////////////////////////////////////////////////////////
+    case returnX(xkPlus1) => // get x(k) from slave
       doneInIteration += 1
-      println("got xk from slave")
+      if (DEBUG)
+        println("got xk from slave")
       for (i <- xkPlus1.indices) {
         xk.PutAt(xkPlus1(i)._1, xkPlus1(i)._2)
       }
-      println(iteration + " iter: xk: " + xk)
+      if (DEBUG)
+        println(iteration + " iter: xk: " + xk)
+
 
       if (doneInIteration == threadsNumber) { // iteration finished
         iteration += 1
-        println("\n Iteration finished")
-        if (iteration > MAX_ITERATIONS) {
-          println("Done")
+        if (DEBUG)
+          println("\n Iteration finished")
+        if (iteration == MAX_ITERATIONS) {
+          val duration = (System.nanoTime - t1) / 1e9d
+          println("Done in: " + duration + " s")
           println(xk)
+
         } else {
           for (i <- workDivision.indices) {
             val start = workDivision(i)._2
@@ -120,7 +115,7 @@ class MasterActor(threadsNum: Int, iterLimit: Int) extends Actor {
   }
 }
 
-object Jacobi extends App {
+object Jacobi extends App{
 
   override def main(args: Array[String]) {
     val threadsCount = 4 // TODO: get threads number
@@ -128,6 +123,8 @@ object Jacobi extends App {
     val system: ActorSystem = ActorSystem("helloAkka")
     val master: ActorRef = system.actorOf(MasterActor.props(threadsCount, MAX_ITERATIONS), "masterActor")
 
-    master ! InitMaster("A_jacobi2.txt", "B_jacobi2.txt")
+    master ! InitMaster("A_jacobi.txt", "B_jacobi.txt")
+//    system.terminate()
+
   }
 }
