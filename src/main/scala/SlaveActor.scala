@@ -21,22 +21,26 @@ class SlaveActor(id: Int) extends Actor {
   var b: Matrix = Matrix.emptyMatrix()
   var D: Matrix = Matrix.emptyMatrix()
   var R: Matrix = Matrix.emptyMatrix()
+  var from = 0
+  var to = 0
 
   override def receive: Receive = {
     case Init(workerNumber, row, col) =>
       println("działa!")
 
-    case InitialData(bMatrix, dMatrix, rMatrix, xVec) =>
+    case InitialData(bMatrix, dMatrix, rMatrix, xVec, start, end) =>
       master = sender
       b = bMatrix
       D = dMatrix
       R = rMatrix
       x0 = xVec
+      from = start
+      to = end
 
-    case Calculate(xk, start, end) =>
-      val results = new Array[(Int, Double)](end - start)
+    case Calculate(xk) =>
+      val results = new Array[(Int, Double)](to - from)
       var len = 0 // elements in results
-      for (i <- start until end) {
+      for (i <- from until to) {
         var rxSum = 0.0
         for(j <- 0 until R.columns){
           if(i != j )

@@ -6,9 +6,9 @@ object MessageType {
 
   case class InitMaster(aFile: String, bFile: String)
 
-  case class InitialData(bMatrix: Matrix, DMatrix: Matrix, RMatrix: Matrix, xVec: Vec)
+  case class InitialData(bMatrix: Matrix, DMatrix: Matrix, RMatrix: Matrix, xVec: Vec, start: Int, end: Int)
 
-  case class Calculate(xk: Vec, start: Int, end: Int)
+  case class Calculate(xk: Vec)
 
   case class X(xk: Map[Int, Double]) // index of element in X vector -> value
 
