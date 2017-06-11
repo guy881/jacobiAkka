@@ -1,13 +1,9 @@
-/**
-  * Created by stevens on 07.06.17.
-  */
-
-import MessageType.{Calculate, Init, InitMaster, InitialData}
+import MessageType._
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 
 object MasterActor {
   def props(threadsNum: Int, iterLimit: Int): Props = {
-    Props(new MasterActor(threadsNum: Int, iterLimit: Int))
+    Props(new MasterActor(threadsNum, iterLimit))
   }
 }
 
@@ -15,13 +11,15 @@ class MasterActor(threadsNum: Int, iterLimit: Int) extends Actor {
   var workNumber = 0
   val threadsNumber: Int = threadsNum
   var iteration = 0
+  var doneInIteration = 0
+  var xk: Vec = Vec.emptyVec()
   var allConverged = false
-  var actorList: List[ActorRef] = Nil
-  var actorPathList: List[String] = Nil
+  var slavesArray = new Array[ActorRef](threadsNumber) // or threads num - 1??
   var mainThread: ActorRef = _
   var lastProcessNumber = 0
   var matrixU: Matrix = Matrix.emptyMatrix()
   val MAX_ITERATIONS: Int = iterLimit
+  var workDivision = new Array[(Int, Int, Int)](threadsNumber) // slave index, start, end
 
   override def receive: Receive = {
     case InitMaster(aFile, bFile) =>
@@ -30,7 +28,7 @@ class MasterActor(threadsNum: Int, iterLimit: Int) extends Actor {
       val b = Matrix.LoadMatrixFromFile(bFile)
 
       val D = new Matrix(A.rows, A.columns) // D^-1
-      val R = new Matrix(A.rows, A.columns)
+    val R = new Matrix(A.rows, A.columns)
 
       for (i <- 0 until A.rows) {
         for (j <- 0 until A.columns) {
@@ -46,50 +44,90 @@ class MasterActor(threadsNum: Int, iterLimit: Int) extends Actor {
         }
       }
 
-      println("A: ")
-      println(A)
-      println("b: ")
-      println(b)
-      println("D ^-1: ")
-      println(D)
-      println("R: ")
-      println(R)
+      //      println("A: ")
+      //      println(A)
+      //      println("b: ")
+      //      println(b)
+      //      println("D ^-1: ")
+      //      println(D)
+      //      println("R: ")
+      //      println(R)
 
-      // create Actors
-      val slave1 = context.actorOf(SlaveActor.props(1))
-      // TODO: create more actors according to threads pool
+      xk = new Vec(A.rows)
+      // create and init slaves
+      for (i <- 0 until threadsNumber) {
+        val slave = context.actorOf(SlaveActor.props(i + 1))
+        slave ! InitialData(b, D, R, xk)
+        slavesArray(i) = slave
+      }
 
       // divide work between actors
 
-      var x0 = new Vec(A.rows)
-      val ITER_LIMIT = 1
+      println(threadsNumber + " threads will be working in range:")
+      println("Max iterations: " + MAX_ITERATIONS)
 
-      slave1 ! InitialData(b, D, R, x0)
+      val rowsPerThread = xk.size / threadsNumber
+      var modulo = xk.size % threadsNumber
+      var end = 0
+      for (i <- 0 until threadsNumber) {
+        val start = end
+        end += rowsPerThread
+        if (modulo > 0) {
+          end += 1
+          modulo -= 1
+        }
+        workDivision(i) = (i, start, end)
+        println((i + 1) + ": " + "start: " + start + " end: " + end)
 
-      for (k <- 0 to ITER_LIMIT) {
-        slave1 ! Calculate(x0)
       }
-      println("Done")
+
+      // send work to actors
+      for (i <- workDivision.indices) {
+        val start = workDivision(i)._2
+        val end = workDivision(i)._3
+        slavesArray(i) ! Calculate(xk, start, end)
+      }
+
     //    x.PrintMatrix()
 
 
-    // send work to actors
-    // send x(k) between actors
     // if converged -> return result
 
-    case X(x) =>
+    // get x(k) from slave
+    case returnX(xkPlus1) =>
+      doneInIteration += 1
+      println("got xk from slave")
+      for (i <- xkPlus1.indices) {
+        xk.PutAt(xkPlus1(i)._1, xkPlus1(i)._2)
+      }
+      println(iteration + " iter: xk: " + xk)
 
+      if (doneInIteration == threadsNumber) { // iteration finished
+        iteration += 1
+        println("\n Iteration finished")
+        if (iteration > MAX_ITERATIONS) {
+          println("Done")
+          println(xk)
+        } else {
+          for (i <- workDivision.indices) {
+            val start = workDivision(i)._2
+            val end = workDivision(i)._3
+            slavesArray(i) ! Calculate(xk, start, end)
+          }
+        }
+        doneInIteration = 0
+      }
   }
 }
 
 object Jacobi extends App {
-  val threadsCount = 4 // TODO: get threads number
-  val MAX_ITERATIONS = 75
 
   override def main(args: Array[String]) {
+    val threadsCount = 4 // TODO: get threads number
+    val MAX_ITERATIONS = 75
     val system: ActorSystem = ActorSystem("helloAkka")
-    val master: ActorRef = system.actorOf(MasterActor.props(threadsCount, MAX_ITERATIONS), "printerActor")
+    val master: ActorRef = system.actorOf(MasterActor.props(threadsCount, MAX_ITERATIONS), "masterActor")
 
-    master ! InitMaster("A_jacobi.txt", "B_jacobi.txt")
+    master ! InitMaster("A_jacobi2.txt", "B_jacobi2.txt")
   }
 }

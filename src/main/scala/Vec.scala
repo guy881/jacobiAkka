@@ -5,7 +5,7 @@ class Vec(val size: Int) extends Serializable{
 
   def dot(that: Vec): Double = {
     if (that.size != this.size){
-      println("two vector size do not match!")
+      throw new Exception("two vector size do not match!")
       0d
     } else {
       (0 until size map (x => this.vec(x) * that.vec(x))).sum
@@ -16,7 +16,7 @@ class Vec(val size: Int) extends Serializable{
 
   def PutAt(i: Int, value: Double): Unit = {
     if (i >= size)
-      println("out of index bounds")
+      throw new Exception("out of index bounds")
     vec(i) = value
   }
   def /(factor: Double): Vec = {

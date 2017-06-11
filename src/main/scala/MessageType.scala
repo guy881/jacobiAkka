@@ -8,11 +8,11 @@ object MessageType {
 
   case class InitialData(bMatrix: Matrix, DMatrix: Matrix, RMatrix: Matrix, xVec: Vec)
 
-  case class Calculate(xk: Vec)
+  case class Calculate(xk: Vec, start: Int, end: Int)
 
   case class X(xk: Map[Int, Double]) // index of element in X vector -> value
 
-  case class xMap(xk: Vec)
+  case class returnX(xk: Array[(Int, Double)])
 
   case object IsConverged
 
