@@ -103,7 +103,7 @@ object Jacobi extends App {
 
   override def main(args: Array[String]) {
     val threadsCount = 4 // TODO: get threads number
-    val MAX_ITERATIONS = 75
+    val MAX_ITERATIONS = 100
     val system: ActorSystem = ActorSystem("helloAkka")
     val master: ActorRef = system.actorOf(MasterActor.props(threadsCount, MAX_ITERATIONS), "masterActor")
 
